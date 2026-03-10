@@ -1,3 +1,4 @@
+// Skales v5.5.0 — Created by Mario Simic — skales.app
 'use strict';
 
 const { app, BrowserWindow, shell, ipcMain, dialog, screen } = require('electron');
@@ -328,7 +329,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      spellcheck: false
     }
   });
 
@@ -434,6 +436,7 @@ function createBuddyWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      spellcheck: false,
       backgroundThrottling: false,  // keep rendering even when window is in background
     },
   });
@@ -754,5 +757,26 @@ ipcMain.on('set-desktop-buddy', (_event, enabled) => {
     if (mainHidden) showBuddyWindow();
   } else {
     hideBuddyWindow();
+  }
+});
+
+// ─── Execute Custom Skill IPC ─────────────────────────────────────────────────
+// Forwards skill execution requests from the renderer to the Next.js backend.
+// Called via window.skales.executeSkill(skillId, args) from any renderer.
+ipcMain.handle('execute-skill', async (_event, skillId, args) => {
+  try {
+    const res = await fetch(`http://localhost:${PORT}/api/custom-skills/execute`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ skillId, args }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error(`[Skales] execute-skill (${skillId}) HTTP ${res.status}:`, data);
+    }
+    return data;
+  } catch (e) {
+    console.error(`[Skales] execute-skill (${skillId}) failed:`, e.message);
+    return { error: e.message };
   }
 });

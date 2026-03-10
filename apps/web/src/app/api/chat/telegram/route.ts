@@ -3,8 +3,10 @@ import { createSession, loadSession, saveSession, type ChatMessage } from '@/act
 import { agentDecide, agentExecute } from '@/actions/orchestrator';
 import { loadSettings } from '@/actions/chat';
 import { telegramQueue } from '@/lib/message-queue';
+import { saveApproval, purgeExpired } from '@/lib/approval-store';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 // Never cache — live Telegram message handler
 export const dynamic = 'force-dynamic';
@@ -378,6 +380,59 @@ You are the same Skales as in the Dashboard. Same brain, same tools, same capabi
                 await saveSession(session);
 
                 const results = await agentExecute(toolCalls);
+
+                // ── Approval gate — any tool needing confirmation? ────────────────────
+                const needsApproval = results.filter(r => r.requiresConfirmation);
+                if (needsApproval.length > 0) {
+                    // Build human-readable descriptions and persist approval state
+                    const descriptions: string[] = results.map(r => r.confirmationMessage || r.toolName || 'unknown action');
+                    const approvalId = randomUUID();
+
+                    // Get Telegram config for the approval endpoint to use when resuming
+                    let tgToken = '';
+                    let tgChatId = telegramChatId;
+                    try {
+                        const { loadTelegramConfig } = await import('@/actions/telegram');
+                        const cfg = await loadTelegramConfig();
+                        tgToken = cfg?.botToken ?? '';
+                    } catch { /* non-fatal */ }
+
+                    purgeExpired();
+                    saveApproval({
+                        id:             approvalId,
+                        sessionId:      session.id,
+                        toolCalls,
+                        descriptions,
+                        createdAt:      Date.now(),
+                        telegramChatId: tgChatId,
+                        telegramToken:  tgToken,
+                        source:         'telegram',
+                    });
+
+                    // Build the approval message with inline keyboard
+                    const actionList = descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n');
+                    finalResponse = `🔐 *Approval required*\n\nSkales wants to:\n${actionList}\n\nPlease confirm:`;
+
+                    // Return with special flag so telegram-bot.js sends the inline keyboard
+                    const assistantMsg: ChatMessage = {
+                        role: 'assistant',
+                        content: finalResponse,
+                        timestamp: Date.now(),
+                    };
+                    (assistantMsg as any).source = 'telegram';
+                    session.messages.push(assistantMsg);
+                    await saveSession(session);
+
+                    return {
+                        success: true,
+                        response: finalResponse,
+                        sessionId: session.id,
+                        generatedMedia: [],
+                        requiresApproval: true,
+                        approvalId,
+                    } as any;
+                }
+                // ── Normal tool execution ──────────────────────────────────────────────
 
                 for (let i = 0; i < results.length; i++) {
                     const res = results[i];

@@ -27,14 +27,26 @@ export const dynamic    = 'force-dynamic';
 export const revalidate = 0;
 
 // ─── Buddy widget mode instruction ───────────────────────────────────────────
-// Capabilities are already injected by processMessage() via capabilities.json.
-// This suffix only adds the widget-specific UX rule: keep responses very short.
+// Capabilities are injected by processMessage() via capabilities.json, but the
+// buddy route does NOT run agentExecute — it only returns LLM text.
+//
+// CRITICAL HONESTY RULE: The LLM must never pretend to execute tools here.
+// Any tool call would be silently dropped. The user must be directed to the
+// main chat for any action that requires file operations, screenshots, etc.
 const BUDDY_WIDGET_SUFFIX =
-    '## Desktop Buddy widget mode\n' +
-    'You are responding inside a small overlay widget (≈190px wide). ' +
-    'Keep ALL answers to 1-3 sentences maximum. ' +
-    'If the topic needs more detail, end with "Open Chat for the full answer." ' +
-    'Never produce long lists or multi-paragraph text here.';
+    '## Desktop Buddy widget mode — IMPORTANT CONSTRAINTS\n' +
+    'You are responding inside a small overlay widget (≈190px wide).\n' +
+    'Keep ALL answers to 1-3 sentences maximum.\n\n' +
+    '### Tool execution is NOT available in this widget.\n' +
+    'This widget cannot run file operations, create documents, take screenshots, ' +
+    'send emails, execute commands, or call ANY tools. If the user asks you to ' +
+    'do something that requires a tool (write a file, create a doc, take a ' +
+    'screenshot, send email, etc.), you MUST respond HONESTLY:\n' +
+    '"I can only do that in the main chat — Open Chat for the full answer."\n' +
+    'NEVER claim to have created, saved, sent, or executed anything. ' +
+    'NEVER fabricate a result. If it needs a tool, redirect to the main chat.\n\n' +
+    'For questions, answers, and conversation: respond normally in 1-3 sentences.\n' +
+    'If the topic needs more detail, end with "Open Chat for the full answer."';
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 

@@ -77,8 +77,9 @@ export default function BuddyPage() {
     const [spotOpen,   setSpotOpen]   = useState(false);
     const [query,      setQuery]      = useState('');
     const [thinking,   setThinking]   = useState(false);
-    const [bubble,     setBubble]     = useState<string | null>(null);
-    const [bubbleLong, setBubbleLong] = useState(false);   // true → show "Open Chat"
+    const [bubble,      setBubble]      = useState<string | null>(null);
+    const [bubbleLong,  setBubbleLong]  = useState(false);   // true → show "Open Chat"
+    const [bubbleIsError, setBubbleIsError] = useState(false); // true → friendly error style
     const inputRef    = useRef<HTMLInputElement>(null);
     const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -114,15 +115,28 @@ export default function BuddyPage() {
         const onCanPlay = () => {
             nextVid.removeEventListener('canplay', onCanPlay);
             nextVid.removeEventListener('error', onError);
-            // play() is async — the first frame isn't painted until at least
-            // one rAF after the promise resolves. Double-rAF guarantees the GPU
-            // has composited the first frame before we swap opacity (= no blank flash).
-            nextVid.play().catch(() => {/* autoplay policy — muted always works */}).finally(() => {
-                requestAnimationFrame(() => requestAnimationFrame(() => {
-                    activeSlot.current = isAActive ? 'b' : 'a';
-                    if (isAActive) { setOpA(0); setOpB(1); }
-                    else            { setOpA(1); setOpB(0); }
-                }));
+
+            // Swap opacity only AFTER the first frame is truly composited on the GPU.
+            // This is the critical fix for the 100-200ms black-frame flicker:
+            //   • requestVideoFrameCallback (rVFC) — Chromium/Electron 86+ — fires
+            //     exactly when a decoded frame has been presented to the compositor.
+            //     This is the most reliable guarantee that the frame is visible.
+            //   • Fallback: double-rAF (guarantees two paint cycles, which is usually
+            //     enough, but rVFC is strictly better).
+            const doSwap = () => {
+                activeSlot.current = isAActive ? 'b' : 'a';
+                if (isAActive) { setOpA(0); setOpB(1); }
+                else            { setOpA(1); setOpB(0); }
+            };
+
+            nextVid.play().catch(() => {/* muted autoplay always works */}).finally(() => {
+                if (typeof (nextVid as any).requestVideoFrameCallback === 'function') {
+                    // rVFC: fires after the first painted frame — zero blank-frame risk
+                    (nextVid as any).requestVideoFrameCallback(doSwap);
+                } else {
+                    // Fallback: two rAFs ensure the GPU compositor has rendered
+                    requestAnimationFrame(() => requestAnimationFrame(doSwap));
+                }
             });
         };
         // Retry on network errors (e.g. ERR_NETWORK_CHANGED during hot-reload)
@@ -204,7 +218,8 @@ export default function BuddyPage() {
         clearBubble();
         setBubble(text);
         setBubbleLong(false);
-        bubbleTimer.current = setTimeout(() => { setBubble(null); }, ms);
+        setBubbleIsError(false);
+        bubbleTimer.current = setTimeout(() => { setBubble(null); setBubbleIsError(false); }, ms);
     };
     useEffect(() => {
         const tryFlush = () => {
@@ -230,7 +245,7 @@ export default function BuddyPage() {
     const handleMascotClick = () => {
         if (thinking) return;
         if (spotOpen) { setSpotOpen(false); setQuery(''); return; }
-        clearBubble(); setBubble(null); setBubbleLong(false);
+        clearBubble(); setBubble(null); setBubbleLong(false); setBubbleIsError(false);
         setSpotOpen(true);
     };
 
@@ -265,11 +280,11 @@ export default function BuddyPage() {
             clearBubble();
             bubbleTimer.current = setTimeout(() => { setBubble(null); setBubbleLong(false); }, 18_000);
         } catch (err: any) {
-            const msg = err?.message ? `Network error: ${err.message}` : 'Network error.';
-            setBubble(msg.slice(0, 110));
-            setBubbleLong(false);
+            setBubble('Oops.. could you take a look?');
+            setBubbleLong(true);
+            setBubbleIsError(true);
             clearBubble();
-            bubbleTimer.current = setTimeout(() => setBubble(null), 15_000);
+            bubbleTimer.current = setTimeout(() => { setBubble(null); setBubbleIsError(false); }, 15_000);
         } finally {
             setThinking(false);
             setTimeout(() => inputRef.current?.focus(), 60);
@@ -292,7 +307,7 @@ export default function BuddyPage() {
         width:           '150px',
         height:          'auto',
         cursor:          'pointer',
-        transition:      'opacity 0.12s ease',       // crossfade between slots
+        transition:      'opacity 0.04s linear',      // near-instant swap; rVFC ensures frame is ready before swap fires
         WebkitAppRegion: 'no-drag',
         // GPU compositor layer — opacity swap happens entirely on GPU, zero CPU repaint
         willChange:      'opacity',
@@ -319,16 +334,17 @@ export default function BuddyPage() {
             {/* ── Speech Bubble ────────────────────────────────────────────── */}
             {bubble && (
                 <div
-                    onClick={() => { clearBubble(); setBubble(null); setBubbleLong(false); }}
+                    aria-live="polite"
+                    onClick={() => { clearBubble(); setBubble(null); setBubbleLong(false); setBubbleIsError(false); }}
                     style={{
                         position:             'absolute',
                         bottom:               '248px',   // above input pill
                         right:                '5px',
                         width:                '190px',
-                        background:           'rgba(10,10,10,0.92)',
+                        background:           bubbleIsError ? 'rgba(20,8,8,0.92)' : 'rgba(10,10,10,0.92)',
                         backdropFilter:       'blur(14px)',
                         WebkitBackdropFilter: 'blur(14px)',
-                        border:               '1px solid rgba(132,204,22,0.35)',
+                        border:               bubbleIsError ? '1px solid rgba(248,113,113,0.45)' : '1px solid rgba(132,204,22,0.35)',
                         borderRadius:         '14px',
                         padding:              '10px 13px',
                         fontSize:             '12px',
@@ -356,6 +372,7 @@ export default function BuddyPage() {
                                 textDecoration: 'underline',
                                 fontWeight:     600,
                             }}
+                            aria-label="Open Skales Chat"
                         >
                             Open Chat →
                         </button>
@@ -420,6 +437,7 @@ export default function BuddyPage() {
                     onKeyDown={handleKey}
                     placeholder="Question or command…"
                     disabled={thinking || !spotOpen}
+                    aria-label="Ask Skales — type your question or command"
                     style={{
                         flex:        1,
                         minWidth:    0,         // allows flex shrink below content width → no text overflow
@@ -444,6 +462,7 @@ export default function BuddyPage() {
                 onEnded={onEnded}
                 onClick={handleMascotClick}
                 style={{ ...videoStyle, opacity: opA }}
+                aria-hidden="true"
             />
 
             {/* ── Mascot video — slot B ─────────────────────────────────────── */}
@@ -454,6 +473,7 @@ export default function BuddyPage() {
                 onEnded={onEnded}
                 onClick={handleMascotClick}
                 style={{ ...videoStyle, opacity: opB }}
+                aria-hidden="true"
             />
 
             {/* ── Global keyframes ─────────────────────────────────────────── */}

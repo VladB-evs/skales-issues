@@ -50,9 +50,19 @@ contextBridge.exposeInMainWorld('skales', {
    * Send a message and await a reply from the main process.
    */
   invoke: (channel, ...args) => {
-    const allowed = ['get-auto-launch', 'show-save-dialog', 'copy-file', 'get-desktop-buddy'];
+    const allowed = ['get-auto-launch', 'show-save-dialog', 'copy-file', 'get-desktop-buddy', 'execute-skill'];
     if (!allowed.includes(channel)) return Promise.reject(new Error(`Channel '${channel}' not allowed`));
     return ipcRenderer.invoke(channel, ...args);
+  },
+
+  /**
+   * Execute a custom skill by ID from the renderer.
+   * Calls the Next.js /api/custom-skills/execute endpoint via the main process.
+   *
+   * Usage: const result = await window.skales.executeSkill('monitor', { action: 'on' })
+   */
+  executeSkill: (skillId, args) => {
+    return ipcRenderer.invoke('execute-skill', skillId, args);
   },
 
   /**

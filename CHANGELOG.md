@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v5.5.0 — March 2026
+
+### Security
+- Approval system enforcement — destructive actions (send email, delete file, calendar changes, tweets) now require explicit user confirmation
+- Browser blacklist now covers Playwright — blocked domains can no longer be bypassed
+- Unrestricted Mode properly bypasses approval gate when enabled
+- Screenshot auto-Telegram removed — only forwards when explicitly requested
+
+### Accessibility
+- ARIA labels on all interactive UI elements (buttons, inputs, navigation, toggles)
+- Full keyboard navigation with visible focus indicators
+- Screen reader support via aria-live regions on chat, buddy bubbles, and approval dialogs
+- Skip-to-main-content link
+- Compatible with NVDA (Windows) and VoiceOver (macOS)
+
+### Desktop Buddy
+- Friendly error messages ("Oops.. could you take a look?") instead of raw errors
+- Video transition flickering fixed (requestVideoFrameCallback)
+- Honest response when tools unavailable ("I can only do that in the main chat — Open Chat →")
+
+### Bug Fixes
+- Input field lock after chat deletion resolved
+- Spellcheck disabled globally (both main window and buddy window)
+- Custom Skill buttons now work (executeSkill IPC bridge added)
+- Confirmation message shown after approved tool execution
+- Browser blacklist property name fix (blocked.blocked)
+
+### Infrastructure
+- Author metadata embedded (package.json, meta.ts, /api/health, settings footer)
+- Skales+ tier system foundation (lib/license.ts)
+- Multilingual architecture foundation (lib/i18n.ts, locales/en.json)
+- Google Analytics on skales.app with click event tracking
+- Community testimonial grid on landing page
+
+---
+
 ## **5.0.0** — The Desktop Companion Update (2026-03-02)
 
 Skales v5.0.0 is the largest single release in the project's history. It ships the full Autopilot meta-agent, Voice Chat, a Custom Skill Ecosystem, Document Generation, Google Places, a Network Scanner, DLNA Casting, a brand-new **Desktop Buddy**, and a comprehensive v5 stability pass covering background polling crashes, Windows notification identity, mic guard on HTTP, cron scheduling, fluid identity, and multi-agent protocol.

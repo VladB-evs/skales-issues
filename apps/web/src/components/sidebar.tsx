@@ -235,6 +235,8 @@ export default function Sidebar({
                         : '3px solid transparent',
                 }}
                 title={collapsed ? label : undefined}
+                aria-label={premium ? `${label} (Premium)` : label}
+                aria-current={isActive ? 'page' : undefined}
             >
                 <Icon
                     icon={icon}
@@ -258,7 +260,10 @@ export default function Sidebar({
         );
 
     return (
-        <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+        <aside
+            className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}
+            aria-label="Application sidebar"
+        >
 
             {/* ── Logo / Brand ─────────────────────────────── */}
             <div
@@ -274,6 +279,7 @@ export default function Sidebar({
                             onClick={onToggle}
                             className="p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors flex justify-center"
                             style={{ color: 'var(--text-muted)' }}
+                            aria-label="Expand sidebar"
                         >
                             <Icon icon={ChevronRight} size={20} />
                         </button>
@@ -300,6 +306,7 @@ export default function Sidebar({
                             onClick={onToggle}
                             className="p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors"
                             style={{ color: 'var(--text-muted)' }}
+                            aria-label="Collapse sidebar"
                         >
                             <Icon icon={ChevronLeft} size={20} />
                         </button>
@@ -339,7 +346,7 @@ export default function Sidebar({
             </div>
 
             {/* ── Navigation ───────────────────────────────── */}
-            <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+            <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5" aria-label="Main navigation">
 
                 {/* MENU */}
                 <SectionLabel label="Menu" />
@@ -375,6 +382,8 @@ export default function Sidebar({
                             borderLeft: pathname === item.menuRoute && !collapsed ? '3px solid #84cc16' : '3px solid transparent',
                         }}
                         title={collapsed ? item.menuName : undefined}
+                        aria-label={item.menuName}
+                        aria-current={pathname === item.menuRoute ? 'page' : undefined}
                     >
                         <SkillIcon icon={item.icon} size={collapsed ? 20 : 18} />
                         {!collapsed && <span>{item.menuName}</span>}
@@ -397,6 +406,7 @@ export default function Sidebar({
                         borderLeft: '3px solid transparent',
                     }}
                     title={collapsed ? 'Docs' : undefined}
+                    aria-label="Documentation (opens in new tab)"
                 >
                     <Icon icon={BookOpen} size={collapsed ? 20 : 18} className="transition-transform group-hover:scale-110" />
                     {!collapsed && (
@@ -419,6 +429,7 @@ export default function Sidebar({
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:bg-[var(--sidebar-hover)] w-full ${collapsed ? 'justify-center' : ''}`}
                         style={{ color: 'var(--text-muted)' }}
                         title={collapsed ? (theme === 'dark' ? 'Light Mode' : 'Dark Mode') : undefined}
+                        aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                     >
                         {theme === 'dark'
                             ? <Icon icon={Sun} size={collapsed ? 20 : 18} />
@@ -432,6 +443,7 @@ export default function Sidebar({
                     onClick={handleShutdown}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:bg-red-500/10 text-red-500 w-full ${collapsed ? 'justify-center' : ''}`}
                     title={collapsed ? 'Stop Server' : undefined}
+                    aria-label="Stop Server"
                 >
                     <Icon icon={Power} size={collapsed ? 20 : 18} />
                     {!collapsed && <span>Stop Server</span>}

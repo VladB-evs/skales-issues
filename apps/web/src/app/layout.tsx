@@ -45,6 +45,10 @@ export default function RootLayout({
                 ` }} />
             </head>
             <body suppressHydrationWarning>
+                {/* Skip-to-main: visible only on keyboard focus (Tab from address bar) */}
+                <a href="#main-content" className="skip-to-main">
+                    Skip to main content
+                </a>
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="dark"

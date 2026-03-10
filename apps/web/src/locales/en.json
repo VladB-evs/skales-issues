@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "language": "English",
+    "locale": "en"
+  },
+
+  "nav": {
+    "chat": "Chat",
+    "settings": "Settings",
+    "tasks": "Tasks",
+    "history": "History",
+    "newSession": "New"
+  },
+
+  "chat": {
+    "placeholder": "Message {{agentName}}...",
+    "placeholderQueuing": "Queuing...",
+    "placeholderCaption": "Caption (optional)...",
+    "placeholderAboutFile": "About {{fileName}}...",
+    "placeholderMultiAgent": "Multi-Agent running - type to queue your message...",
+    "send": "Send message",
+    "stop": "Stop generating and clear queue",
+    "queueMessage": "Queue message",
+    "queueMessageCount": "Queue message ({{count}} already queued)",
+    "queueMultiAgent": "Queue message (Multi-Agent running)",
+    "attachFile": "Attach file",
+    "openSlashCommands": "Open slash commands",
+    "toggleSummarize": "Toggle summarize mode",
+    "imageVideoGeneration": "Image / Video generation",
+    "voiceChatEnter": "Enter Voice Chat",
+    "voiceChatLeave": "Leave Voice Chat",
+    "voice": "Voice",
+    "messages": "Chat messages",
+    "sessionHistory": "Show session history",
+    "hideSessionHistory": "Hide session history",
+    "noSessions": "No sessions yet",
+    "sessions": "Sessions",
+    "refreshSessions": "Refresh sessions",
+    "closeSessions": "Close sessions panel",
+    "deleteSession": "Delete session",
+    "showAll": "Show All ({{count}})",
+    "showLess": "Show Less",
+    "queued": "{{count}} message queued",
+    "queuedPlural": "{{count}} messages queued",
+    "queueSendWhenReady": "will send when ready"
+  },
+
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "saved": "Saved!",
+    "saving": "Saving...",
+    "apiKey": "API Key",
+    "model": "Model",
+    "theme": "Theme",
+    "language": "Language",
+    "languageDesc": "Choose the display language for the Skales interface.",
+    "languageEnglishOnly": "More languages coming soon.",
+    "launchAtLogin": "Launch at Login",
+    "launchAtLoginDesc": "Start Skales automatically when you log in to your computer.",
+    "desktopBuddy": "Desktop Buddy",
+    "desktopBuddyDesc": "Show a floating Skales mascot on your desktop with a quick-action spotlight.",
+    "persona": "Persona",
+    "personaDesc": "Choose how Skales behaves. You can switch anytime.",
+    "skalesPlus": "Skales+",
+    "currentPlan": "Your current plan:"
+  },
+
+  "buddy": {
+    "openChat": "Open Chat",
+    "errorMessage": "Oops.. something didn't work. Could you take a look?"
+  },
+
+  "tasks": {
+    "title": "Tasks",
+    "noTasks": "No tasks yet",
+    "createTask": "Create task",
+    "runNow": "Run now",
+    "delete": "Delete"
+  },
+
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "approve": "Approve",
+    "deny": "Deny",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "edit": "Edit",
+    "delete": "Delete",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "retry": "Retry",
+    "refresh": "Refresh"
+  }
+}

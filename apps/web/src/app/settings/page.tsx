@@ -47,6 +47,8 @@ import {
 import {
     exportData, importData, cleanupExports,
 } from '@/actions/backup';
+import { getUserTier, FEATURE_CONFIG, getFeatureTierLabel } from '@/lib/license';
+import { useTranslation, SUPPORTED_LOCALES } from '@/lib/i18n';
 import {
     setAutonomousMode,
 } from '@/actions/autonomous';
@@ -175,6 +177,7 @@ const PERSONAS = [
 ];
 
 export default function SettingsPage() {
+    const { locale, setLocale } = useTranslation();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -1285,12 +1288,53 @@ export default function SettingsPage() {
                                     style={{
                                         background: theme === t.key ? 'var(--surface)' : 'transparent',
                                         color: theme === t.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                                    }}>
+                                    }}
+                                    aria-label={`Set ${t.label} theme`}>
                                     {t.icon} {t.label}
                                 </button>
                             ))}
                         </div>
                     </section>
+
+                    {/* ─── Skales+ (hidden feature flag section — shown when SKALES_PLUS=true) ─── */}
+                    {process.env.NEXT_PUBLIC_SKALES_PLUS === 'true' && (
+                        <section className="rounded-2xl border p-6"
+                            style={{ background: 'var(--surface)', borderColor: 'rgba(132,204,22,0.3)' }}>
+                            <h2 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                                <Sparkles size={20} className="text-lime-400" />
+                                Skales+
+                                <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                    style={{ background: 'rgba(132,204,22,0.15)', color: '#84cc16', border: '1px solid rgba(132,204,22,0.3)' }}>
+                                    BETA
+                                </span>
+                            </h2>
+                            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+                                Your current plan: <strong style={{ color: '#84cc16' }}>{getUserTier().charAt(0).toUpperCase() + getUserTier().slice(1)}</strong>
+                            </p>
+                            <div className="space-y-2">
+                                {Object.entries(FEATURE_CONFIG).map(([key, tier]) => {
+                                    const label = getFeatureTierLabel(key);
+                                    if (!label) return null;
+                                    return (
+                                        <div key={key} className="flex items-center justify-between py-1.5 px-3 rounded-xl"
+                                            style={{ background: 'var(--surface-light)', border: '1px solid var(--border)' }}>
+                                            <span className="text-sm capitalize" style={{ color: 'var(--text-primary)' }}>
+                                                {key.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                                style={{
+                                                    background: tier === 'pro' ? 'rgba(168,85,247,0.15)' : 'rgba(132,204,22,0.15)',
+                                                    color: tier === 'pro' ? '#a855f7' : '#84cc16',
+                                                    border: `1px solid ${tier === 'pro' ? 'rgba(168,85,247,0.3)' : 'rgba(132,204,22,0.3)'}`,
+                                                }}>
+                                                {label}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
 
                     {/* ─── Desktop App (Electron only) ─── */}
                     {isElectron && (
@@ -1300,6 +1344,36 @@ export default function SettingsPage() {
                                 <Monitor size={20} className="text-purple-500" />
                                 Desktop App
                             </h2>
+                            {/* ── Language ── */}
+                            <div className="flex items-center justify-between py-1 mb-3 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+                                <div>
+                                    <p className="text-sm font-medium flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                                        <Globe size={14} className="text-blue-400" />
+                                        Language
+                                    </p>
+                                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                        Interface language. More languages coming soon.
+                                    </p>
+                                </div>
+                                <select
+                                    value={locale}
+                                    onChange={e => setLocale(e.target.value)}
+                                    className="text-sm rounded-lg px-3 py-1.5 border outline-none focus:ring-1 focus:ring-lime-500"
+                                    style={{
+                                        background: 'var(--surface-light)',
+                                        color: 'var(--text-primary)',
+                                        borderColor: 'var(--border)',
+                                    }}
+                                    aria-label="Select interface language"
+                                >
+                                    {SUPPORTED_LOCALES.map(l => (
+                                        <option key={l.code} value={l.code}>
+                                            {l.flag} {l.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="flex items-center justify-between py-1">
                                 <div>
                                     <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Launch at Login</p>
@@ -1316,6 +1390,7 @@ export default function SettingsPage() {
                                     }}
                                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${autoLaunch ? 'bg-purple-600' : 'bg-gray-600'}`}
                                     aria-pressed={autoLaunch}
+                                    aria-label="Toggle Launch at Login"
                                     title={autoLaunch ? 'Disable launch at login' : 'Enable launch at login'}
                                 >
                                     <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${autoLaunch ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -1341,6 +1416,7 @@ export default function SettingsPage() {
                                     }}
                                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${desktopBuddy ? 'bg-lime-500' : 'bg-gray-600'}`}
                                     aria-pressed={desktopBuddy}
+                                    aria-label="Toggle Desktop Buddy"
                                     title={desktopBuddy ? 'Hide desktop buddy' : 'Show desktop buddy'}
                                 >
                                     <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${desktopBuddy ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -1372,6 +1448,7 @@ export default function SettingsPage() {
                                         borderColor: persona === p.id ? '#84cc16' : 'var(--border)',
                                         background: persona === p.id ? 'var(--accent-glow)' : 'var(--background)',
                                     }}
+                                    aria-label={`${p.label} persona`}
                                 >
                                     <span className="text-2xl block mb-1">{p.emoji}</span>
                                     <span className="text-xs font-bold block" style={{ color: 'var(--text-primary)' }}>{p.label}</span>
@@ -1401,6 +1478,7 @@ export default function SettingsPage() {
                                         border: '1px solid var(--border)',
                                         color: 'var(--text-primary)',
                                     }}
+                                    aria-label="Select native language"
                                 >
                                     <option value="en">English</option>
                                     <option value="de">German (Deutsch)</option>
@@ -1426,7 +1504,8 @@ export default function SettingsPage() {
                                 </label>
                                 {customPromptActive && (
                                     <button onClick={handleResetPrompt}
-                                        className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors">
+                                        className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                        aria-label="Reset system prompt to default">
                                         Reset to Default
                                     </button>
                                 )}
@@ -1446,6 +1525,7 @@ export default function SettingsPage() {
                                         border: `1px solid ${customPromptActive ? 'rgba(245, 158, 11, 0.5)' : 'var(--border)'}`,
                                         color: 'var(--text-primary)',
                                     }}
+                                    aria-label="System prompt / Soul Identity"
                                 />
                                 {customPromptActive && (
                                     <span className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 font-bold">
@@ -1504,6 +1584,7 @@ export default function SettingsPage() {
                                                     onClick={() => setActiveProvider(provider.id)}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20' : 'hover:bg-[var(--surface-light)]'}`}
                                                     style={!isActive ? { color: 'var(--text-muted)', border: '1px solid var(--border)' } : undefined}
+                                                    aria-label={`Set ${provider.label} as active provider`}
                                                 >
                                                     {isActive ? '✓ Active' : 'Set Active'}
                                                 </button>
@@ -1519,7 +1600,8 @@ export default function SettingsPage() {
                                                         onChange={(e) => setApiKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
                                                         placeholder={`Enter ${provider.label} API key...`}
                                                         className="w-full p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500"
-                                                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                                                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                        aria-label={`API key for ${provider.label}`} />
                                                 </div>
                                             )}
                                             {provider.id === 'ollama' && (
@@ -1542,6 +1624,7 @@ export default function SettingsPage() {
                                                     }}
                                                     className="w-full p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500 appearance-none cursor-pointer"
                                                     style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                    aria-label={`Model name for ${provider.label}`}
                                                 >
                                                     {PROVIDER_MODELS[provider.id]?.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                                     <option value="__custom__">✏️ Custom model...</option>
@@ -1551,7 +1634,8 @@ export default function SettingsPage() {
                                                         onChange={(e) => setModels(prev => ({ ...prev, [provider.id]: e.target.value }))}
                                                         placeholder="Enter custom model name..."
                                                         className="w-full mt-2 p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500"
-                                                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                                                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                        aria-label={`Custom model name for ${provider.label}`} />
                                                 )}
                                             </div>
                                         </div>
@@ -1570,7 +1654,8 @@ export default function SettingsPage() {
                                         )}
                                         <button onClick={() => handleTest(provider.id)} disabled={isTesting}
                                             className="mt-3 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 hover:bg-[var(--surface-light)]"
-                                            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                                            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                            aria-label={`Test connection for ${provider.label}`}>
                                             {isTesting ? <><Loader2 size={12} className="animate-spin" /> Testing...</> : <><TestTube2 size={12} /> Test Connection</>}
                                         </button>
                                         {testResult && (
@@ -1630,6 +1715,7 @@ export default function SettingsPage() {
                                                             onClick={() => setActiveProvider(provider.id)}
                                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20' : 'hover:bg-[var(--surface-light)]'}`}
                                                             style={!isActive ? { color: 'var(--text-muted)', border: '1px solid var(--border)' } : undefined}
+                                                            aria-label={`Set ${provider.label} as active provider`}
                                                         >
                                                             {isActive ? '✓ Active' : 'Set Active'}
                                                         </button>
@@ -1645,7 +1731,8 @@ export default function SettingsPage() {
                                                                 onChange={(e) => setApiKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
                                                                 placeholder={`Enter ${provider.label} API key...`}
                                                                 className="w-full p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500"
-                                                                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                                                                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                                aria-label={`API key for ${provider.label}`} />
                                                         </div>
                                                     )}
                                                     <div>
@@ -1658,6 +1745,7 @@ export default function SettingsPage() {
                                                             }}
                                                             className="w-full p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500 appearance-none cursor-pointer"
                                                             style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                            aria-label={`Model name for ${provider.label}`}
                                                         >
                                                             {PROVIDER_MODELS[provider.id]?.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                                             <option value="__custom__">✏️ Custom model...</option>
@@ -1667,7 +1755,8 @@ export default function SettingsPage() {
                                                                 onChange={(e) => setModels(prev => ({ ...prev, [provider.id]: e.target.value }))}
                                                                 placeholder="Enter custom model name..."
                                                                 className="w-full mt-2 p-2.5 rounded-lg text-sm outline-none transition-all focus:ring-1 focus:ring-lime-500"
-                                                                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                                                                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                                aria-label={`Custom model name for ${provider.label}`} />
                                                         )}
                                                     </div>
                                                 </div>
@@ -1705,7 +1794,8 @@ export default function SettingsPage() {
                                                 )}
                                                 <button onClick={() => handleTest(provider.id)} disabled={isTesting}
                                                     className="mt-3 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 hover:bg-[var(--surface-light)]"
-                                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                                    aria-label={`Test connection for ${provider.label}`}>
                                                     {isTesting ? <><Loader2 size={12} className="animate-spin" /> Testing...</> : <><TestTube2 size={12} /> Test Connection</>}
                                                 </button>
                                                 {testResult && (
@@ -1731,6 +1821,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setActiveBehavior(prev => ({ ...prev!, enabled: !prev?.enabled }))}
                                 className={`relative w-12 h-6 rounded-full transition-all ${activeBehavior?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
+                                aria-label="Toggle Friend Mode"
                             >
                                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${activeBehavior?.enabled ? 'left-7' : 'left-1'}`} />
                             </button>
@@ -1751,6 +1842,7 @@ export default function SettingsPage() {
                                             onClick={() => setActiveBehavior(prev => ({ ...prev!, frequency: freq }))}
                                             className={`py-2 px-3 rounded-xl text-sm font-medium border-2 transition-all ${activeBehavior?.frequency === freq ? 'border-lime-500 bg-lime-500/10 text-lime-400' : 'border-transparent hover:border-[var(--border)]'}`}
                                             style={{ background: activeBehavior?.frequency === freq ? undefined : 'var(--background)', color: activeBehavior?.frequency === freq ? undefined : 'var(--text-secondary)' }}
+                                            aria-label={`Set Friend Mode frequency to ${freq === 'low' ? 'rarely' : freq === 'medium' ? 'sometimes' : 'often'}`}
                                         >
                                             {freq === 'low' ? '🌙 Rarely' : freq === 'medium' ? '☀️ Sometimes' : '⚡ Often'}
                                             <span className="block text-[10px] mt-0.5 opacity-70">
@@ -1917,6 +2009,8 @@ export default function SettingsPage() {
                                         className="relative flex-shrink-0 w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-lime-500 focus:ring-offset-1 disabled:opacity-60"
                                         style={{ background: isAutonomousMode ? '#84cc16' : 'var(--border)' }}
                                         aria-label={isAutonomousMode ? 'Disable Autonomous Mode' : 'Enable Autonomous Mode'}
+                                        role="switch"
+                                        aria-checked={isAutonomousMode}
                                     >
                                         <span
                                             className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
@@ -2201,6 +2295,7 @@ export default function SettingsPage() {
                                         : 'border-transparent hover:border-[var(--border)]'
                                         }`}
                                     style={{ background: ttsConfig?.provider === p ? undefined : 'var(--background)', color: ttsConfig?.provider === p ? undefined : 'var(--text-secondary)' }}
+                                    aria-label={`Select ${p === 'default' ? 'Default' : p === 'elevenlabs' ? 'ElevenLabs' : 'Azure'} as TTS provider`}
                                 >
                                     {p === 'default' ? '⚡ Default' : p === 'elevenlabs' ? '🎙️ ElevenLabs' : '☁️ Azure'}
                                 </button>
@@ -2307,6 +2402,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setGifConfig(prev => ({ ...prev!, enabled: !prev?.enabled }))}
                                 className={`relative w-12 h-6 rounded-full transition-all ${gifConfig?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
+                                aria-label="Toggle GIF & Sticker Integration"
                             >
                                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${gifConfig?.enabled ? 'left-7' : 'left-1'}`} />
                             </button>
@@ -2329,6 +2425,7 @@ export default function SettingsPage() {
                                                 : 'border-transparent hover:border-[var(--border)]'
                                                 }`}
                                             style={{ background: gifConfig?.provider === p ? undefined : 'var(--background)', color: gifConfig?.provider === p ? undefined : 'var(--text-secondary)' }}
+                                            aria-label={`Select ${p === 'klipy' ? 'Klipy' : 'Giphy'} as GIF provider`}
                                         >
                                             {p === 'klipy' ? '🎬' : '🎪'} {p.charAt(0).toUpperCase() + p.slice(1)}
                                         </button>
@@ -2715,6 +2812,7 @@ export default function SettingsPage() {
                                                                                 <button
                                                                                     onClick={() => handleWaToggleContact(contact.id, !contact.permitted)}
                                                                                     className={`relative w-9 h-5 rounded-full transition-all flex-shrink-0 ${contact.permitted ? 'bg-green-500' : 'bg-gray-600'}`}
+                                                                                    aria-label={`Toggle message permission for ${contact.name}`}
                                                                                 >
                                                                                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${contact.permitted ? 'left-4' : 'left-0.5'}`} />
                                                                                 </button>
@@ -2773,6 +2871,7 @@ export default function SettingsPage() {
                                                                 <button
                                                                     onClick={() => setWaSignature(prev => ({ ...prev, enabled: !prev.enabled }))}
                                                                     className={`relative w-9 h-5 rounded-full transition-all flex-shrink-0 ${waSignature.enabled ? 'bg-green-500' : 'bg-gray-600'}`}
+                                                                    aria-label="Toggle message signature"
                                                                 >
                                                                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${waSignature.enabled ? 'left-4' : 'left-0.5'}`} />
                                                                 </button>
@@ -2984,7 +3083,8 @@ export default function SettingsPage() {
                                     </button>
                                     <button type="button" onClick={() => toggleSkill('googleCalendar')}
                                         className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${activeSkillIds.has('googleCalendar') ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                        role="switch" aria-checked={activeSkillIds.has('googleCalendar')}>
+                                        role="switch" aria-checked={activeSkillIds.has('googleCalendar')}
+                                        aria-label="Toggle Google Calendar skill">
                                         <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${activeSkillIds.has('googleCalendar') ? 'translate-x-7' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
@@ -3612,7 +3712,8 @@ export default function SettingsPage() {
                                     </div>
                                     <button type="button" onClick={() => toggleSkill('systemMonitor')}
                                         className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${skills?.systemMonitor?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                        role="switch" aria-checked={!!skills?.systemMonitor?.enabled}>
+                                        role="switch" aria-checked={!!skills?.systemMonitor?.enabled}
+                                        aria-label="Toggle System Monitor skill">
                                         <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${skills?.systemMonitor?.enabled ? 'translate-x-7' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
@@ -3631,7 +3732,8 @@ export default function SettingsPage() {
                                     </div>
                                     <button type="button" onClick={() => toggleSkill('localFileChat')}
                                         className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${skills?.localFileChat?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                        role="switch" aria-checked={!!skills?.localFileChat?.enabled}>
+                                        role="switch" aria-checked={!!skills?.localFileChat?.enabled}
+                                        aria-label="Toggle Local File Chat skill">
                                         <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${skills?.localFileChat?.enabled ? 'translate-x-7' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
@@ -3654,7 +3756,8 @@ export default function SettingsPage() {
                                         {webhookEnabling && <Loader2 size={16} className="animate-spin text-lime-400" />}
                                         <button type="button" onClick={handleWebhookToggle} disabled={webhookEnabling}
                                             className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${webhookConfig?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                            role="switch" aria-checked={!!webhookConfig?.enabled}>
+                                            role="switch" aria-checked={!!webhookConfig?.enabled}
+                                            aria-label="Toggle Webhooks">
                                             <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${webhookConfig?.enabled ? 'translate-x-7' : 'translate-x-0'}`} />
                                         </button>
                                     </div>
@@ -3730,7 +3833,8 @@ export default function SettingsPage() {
                                         </button>
                                         <button type="button" onClick={() => toggleSkill('discord')}
                                             className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${activeSkillIds.has('discord') ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                            role="switch" aria-checked={activeSkillIds.has('discord')}>
+                                            role="switch" aria-checked={activeSkillIds.has('discord')}
+                                            aria-label="Toggle Discord Bot">
                                             <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${activeSkillIds.has('discord') ? 'translate-x-7' : 'translate-x-0'}`} />
                                         </button>
                                     </div>
@@ -3815,7 +3919,8 @@ export default function SettingsPage() {
                                         </button>
                                         <button type="button" onClick={() => toggleSkill('browserControl')}
                                             className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${skills?.browserControl?.enabled ? 'bg-lime-500' : 'bg-gray-600'}`}
-                                            role="switch" aria-checked={!!skills?.browserControl?.enabled}>
+                                            role="switch" aria-checked={!!skills?.browserControl?.enabled}
+                                            aria-label="Toggle Browser Control skill">
                                             <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${skills?.browserControl?.enabled ? 'translate-x-7' : 'translate-x-0'}`} />
                                         </button>
                                     </div>
@@ -3865,7 +3970,9 @@ export default function SettingsPage() {
                                                     </div>
                                                     <button type="button"
                                                         onClick={() => setBrowserControlConfig(p => ({ ...p, autoApproveNavigation: !p.autoApproveNavigation }))}
-                                                        className={`relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${browserControlConfig.autoApproveNavigation ? 'bg-lime-500' : 'bg-gray-600'}`}>
+                                                        className={`relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${browserControlConfig.autoApproveNavigation ? 'bg-lime-500' : 'bg-gray-600'}`}
+                                                        aria-label="Toggle auto-approve navigation"
+                                                    >
                                                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${browserControlConfig.autoApproveNavigation ? 'translate-x-6' : 'translate-x-0'}`} />
                                                     </button>
                                                 </div>
@@ -4101,6 +4208,7 @@ export default function SettingsPage() {
                                     className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${fileSystemAccess === 'full' ? 'bg-amber-500' : 'bg-gray-600'}`}
                                     aria-checked={fileSystemAccess === 'full'}
                                     role="switch"
+                                    aria-label="Toggle file system access level"
                                 >
                                     <span
                                         className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ${fileSystemAccess === 'full' ? 'translate-x-7' : 'translate-x-0'}`}
@@ -4242,6 +4350,7 @@ export default function SettingsPage() {
                                                         await saveBlacklists(updated);
                                                     }}
                                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${blacklists.domainBlacklistEnabled ? 'bg-lime-500' : 'bg-gray-600'}`}
+                                                    aria-label="Toggle website blacklist"
                                                 >
                                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${blacklists.domainBlacklistEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                                                 </button>
@@ -4299,6 +4408,7 @@ export default function SettingsPage() {
                                                         await saveBlacklists(updated);
                                                     }}
                                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${blacklists.buzzwordFilterEnabled ? 'bg-lime-500' : 'bg-gray-600'}`}
+                                                    aria-label="Toggle search safety filter"
                                                 >
                                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${blacklists.buzzwordFilterEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                                                 </button>
@@ -4647,6 +4757,23 @@ export default function SettingsPage() {
                         Save Settings
                     </button>
                 </div>
+            {/* Footer */}
+            <div className="mt-12 pb-32 text-center">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Made by Mario Simic &bull;{' '}
+                    <a
+                        href="https://skales.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Visit skales.app (opens in new tab)"
+                        style={{ color: 'var(--text-muted)' }}
+                        className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+                    >
+                        skales.app
+                    </a>
+                </p>
+            </div>
+
             </div>{/* max-w-4xl mx-auto */}
         </div>
     );

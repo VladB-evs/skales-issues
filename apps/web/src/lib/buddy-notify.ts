@@ -18,8 +18,9 @@ const QUEUE_FILE = path.join(DATA_DIR, 'buddy-queue.json');
 const MAX_QUEUE  = 20; // prevent unbounded growth if buddy window is closed
 
 export interface BuddyNotification {
-    text: string;
-    ts:   number;
+    text:     string;
+    ts:       number;
+    isError?: boolean;   // true → buddy shows friendly "Oops" message + Open Chat button
 }
 
 function readQueue(): BuddyNotification[] {
@@ -46,11 +47,27 @@ function writeQueue(queue: BuddyNotification[]): void {
  *   pushBuddyNotification('✅ Task "Send weekly report" completed.');
  *   pushBuddyNotification('📧 Email sent to john@example.com.');
  */
-export function pushBuddyNotification(text: string): void {
+export function pushBuddyNotification(text: string, isError = false): void {
+    // Detect raw error/XML/stack traces and replace with friendly message
+    const looksLikeRawError = (
+        text.includes('<tool_call') ||
+        text.includes('Error:') && text.length > 200 ||
+        text.includes('at Object.') ||
+        text.includes('TypeError:') ||
+        text.includes('SyntaxError:')
+    );
+    const cleanText = looksLikeRawError
+        ? "Oops.. something didn't work. Could you take a look?"
+        : text.slice(0, 300);
     const queue = readQueue();
-    queue.push({ text: text.slice(0, 200), ts: Date.now() });
+    queue.push({ text: cleanText, ts: Date.now(), isError: isError || looksLikeRawError });
     // Keep only the most recent MAX_QUEUE notifications
     writeQueue(queue.slice(-MAX_QUEUE));
+}
+
+/** Push an error notification — shows friendly message + "Open Chat" button. */
+export function pushBuddyError(rawError?: string): void {
+    pushBuddyNotification(rawError || "Oops.. something didn't work. Could you take a look?", true);
 }
 
 /**

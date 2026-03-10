@@ -154,12 +154,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     onToggle={toggleSidebar}
                 />
 
-                <main className={`main-content ${sidebarCollapsed ? 'main-content-expanded' : ''}`}>
+                <main id="main-content" className={`main-content ${sidebarCollapsed ? 'main-content-expanded' : ''}`}>
                     {/* Mobile header — shrink-0 so it never gets squeezed out */}
                     <div className="md:hidden shrink-0 flex items-center gap-3 p-4 border-b" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
                         <button
                             onClick={toggleSidebar}
                             className="p-2 rounded-lg hover:bg-[var(--surface-light)]"
+                            aria-label="Open navigation menu"
                         >
                             <Icon icon={Menu} size={20} />
                         </button>
@@ -195,7 +196,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                                     </div>
                                     <button onClick={dismissEmailNotifs}
                                         className="p-1 rounded-lg hover:bg-blue-500/10 transition-colors shrink-0"
-                                        title="Dismiss">
+                                        title="Dismiss"
+                                        aria-label="Dismiss email notifications">
                                         <Icon icon={X} size={14} className="text-blue-400" />
                                     </button>
                                 </div>

@@ -329,6 +329,20 @@ export async function getBrowserStatus(): Promise<{ active: boolean; url?: strin
  * Takes a screenshot and returns a vision description of the page.
  */
 export async function browserOpen(url: string): Promise<BrowserActionResult> {
+    // ── BLACKLIST CHECK ──────────────────────────────────────────────────────
+    // browser_open must respect the same domain blocklist as fetch_web_page.
+    try {
+        const { checkDomainBlocked } = await import('./blacklist');
+        const blocked = await checkDomainBlocked(url);
+        if (blocked.blocked) {
+            return {
+                success: false,
+                error: `🚫 Access to **${blocked.domain}** is blocked by the security blacklist. This domain is restricted for safety reasons.`,
+            };
+        }
+    } catch { /* non-fatal — continue if blacklist check itself errors */ }
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
         // Lazy-require playwright so it's only loaded when actually needed
         // (webpackIgnore prevents Next.js bundler from trying to bundle it)

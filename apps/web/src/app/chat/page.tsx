@@ -502,7 +502,7 @@ const MessageListArea = memo(function MessageListArea({
     scrollRef: React.RefObject<HTMLDivElement>;
 }) {
     return (
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" role="log" aria-live="polite" aria-label="Chat messages">
             {messages.map((msg, idx) => {
                 if (msg.role === 'tool') return null;
                 // Safely extract text — content can be a string or a multimodal array (e.g. image via Telegram)
@@ -863,6 +863,16 @@ export default function ChatPage() {
     const audioChunksRef     = useRef<Blob[]>([]);
     const ttsAudioRef        = useRef<HTMLAudioElement | null>(null);
 
+    // ── Approval / Confirmation State ───────────────────────────────────────
+    // When the agent wants to run a 'confirm'-level tool, execution is paused
+    // and this state holds the pending context until the user approves/cancels.
+    const [pendingApproval, setPendingApproval] = useState<{
+        toolCalls: import('@/actions/orchestrator').ToolCall[];
+        confirmedIds: string[];      // IDs already approved in this batch
+        pendingIds: string[];        // IDs that still need approval
+        messages: string[];          // human-readable description per pending tool
+    } | null>(null);
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     // Track whether the user is at (or near) the bottom of the message list.
@@ -888,6 +898,57 @@ export default function ChatPage() {
         setMessages(prev => [
             ...prev.filter(m => m.role !== 'tool-status'),
             { role: 'assistant', content: '🛑 Stopped.' }
+        ]);
+    };
+
+    // ── Approval System Handlers ─────────────────────────────────────────────
+    const handleApproveTools = async () => {
+        if (!pendingApproval) return;
+        const { toolCalls, confirmedIds, pendingIds } = pendingApproval;
+        const allConfirmed = [...confirmedIds, ...pendingIds];
+        setPendingApproval(null);
+        setLoading(true);
+
+        try {
+            // Re-run only the tools that were pending (now confirmed)
+            const pendingCalls = toolCalls.filter(tc => pendingIds.includes(tc.id));
+            const confirmedResults = await agentExecute(pendingCalls, allConfirmed);
+
+            // Build a short confirmation summary so the user knows what happened
+            const succeeded = confirmedResults.filter(r => r.success);
+            const failed    = confirmedResults.filter(r => !r.success);
+            let confirmSummary = '';
+            if (succeeded.length > 0 && failed.length === 0) {
+                confirmSummary = `✅ Done — ${succeeded.map(r => r.toolName).join(', ')} completed successfully.`;
+            } else if (succeeded.length > 0 && failed.length > 0) {
+                confirmSummary = `⚠️ Completed with issues — ${succeeded.length} succeeded, ${failed.length} failed.`;
+            } else {
+                confirmSummary = `❌ All actions failed. Check the results below for details.`;
+            }
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    role: 'assistant',
+                    content: confirmSummary,
+                    toolCalls: pendingCalls,
+                    toolResults: confirmedResults,
+                    timestamp: Date.now(),
+                } as any,
+            ]);
+        } catch (e) {
+            setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Error executing approved tools.' }]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDenyTools = () => {
+        if (!pendingApproval) return;
+        setPendingApproval(null);
+        setMessages(prev => [
+            ...prev,
+            { role: 'assistant', content: '🚫 Action cancelled — no changes were made.' },
         ]);
     };
 
@@ -1722,8 +1783,22 @@ export default function ChatPage() {
             await deleteSession(id);
             setSessions(prev => prev.filter(s => s.id !== id));
             if (sessionId === id) {
+                // ── FIX: Input-Field Lock ──────────────────────────────────────
+                // Reset ALL stateful UI that could block the input after deletion.
+                // Without this reset, stale `loading` or `pendingApproval` state
+                // from the deleted session would keep the input permanently locked.
                 setSessionId(null);
                 setMessages([{ role: 'assistant', content: "Session deleted. Starting fresh! 🦎" }]);
+                setLoading(false);
+                setInput('');
+                setPastedImage(null);
+                setAttachedFile(null);
+                setPendingApproval(null);
+                setIsMultiAgentRunning(false);
+                setMessageQueue([]);
+                setShowSessions(false);
+                // Re-focus the input after state reset so it's immediately usable
+                setTimeout(() => inputRef.current?.focus(), 50);
             }
         } catch (e) {
             console.error('Failed to delete session:', e);
@@ -2028,8 +2103,48 @@ export default function ChatPage() {
                         }
                     }
 
-                    // 3. EXECUTE TOOLS
-                    const results = await agentExecute(decision.toolCalls!);
+                    // 3. EXECUTE TOOLS (with approval gate support)
+                    // First pass: run without any confirmed IDs to discover which need approval
+                    const firstPassResults = await agentExecute(decision.toolCalls!, []);
+                    const needingApproval = firstPassResults.filter(r => r.requiresConfirmation);
+                    let results: typeof firstPassResults;
+
+                    if (needingApproval.length > 0) {
+                        // Pause execution — show approval bubble
+                        const pendingIds = decision.toolCalls!
+                            .filter((_, i) => firstPassResults[i]?.requiresConfirmation)
+                            .map(tc => tc.id);
+                        const pendingMsgs = needingApproval.map(r => r.confirmationMessage || r.displayMessage);
+
+                        // Update UI to show partial results already executed
+                        const alreadyDone = firstPassResults.filter(r => !r.requiresConfirmation);
+                        if (alreadyDone.length > 0) {
+                            assistantMsg.toolResults = alreadyDone;
+                            setMessages(prev => prev.map(m =>
+                                (m === assistantMsg || (m.role === 'assistant' && m.toolCalls === decision.toolCalls))
+                                    ? { ...m, toolResults: alreadyDone }
+                                    : m
+                            ));
+                        }
+
+                        // Store pending state — the approval bubble renders from this
+                        setPendingApproval({
+                            toolCalls: decision.toolCalls!,
+                            confirmedIds: decision.toolCalls!
+                                .filter((_, i) => !firstPassResults[i]?.requiresConfirmation)
+                                .map(tc => tc.id),
+                            pendingIds,
+                            messages: pendingMsgs,
+                        });
+
+                        setMessages(prev => [
+                            ...prev.filter(m => m.role !== 'tool-status'),
+                        ]);
+                        setLoading(false);
+                        return; // pause the agent loop — user must approve to continue
+                    }
+
+                    results = firstPassResults;
 
                     // Detect multi-agent dispatch
                     const multiAgentResult = results.find(r => r.toolName === 'dispatch_subtasks' && r.success);
@@ -2700,6 +2815,7 @@ export default function ChatPage() {
                         onClick={handleNewSession}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 hover:bg-[var(--surface-light)]"
                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                        aria-label="New session"
                     >
                         <Icon icon={Plus} size={14} />
                         <span className="hidden md:inline">New</span>
@@ -2715,6 +2831,8 @@ export default function ChatPage() {
                                 color:        isVoiceChatMode ? '#ef4444' : 'var(--text-secondary)',
                             }}
                             title={isVoiceChatMode ? 'Leave Voice Chat' : 'Enter Voice Chat'}
+                            aria-label={isVoiceChatMode ? 'Leave Voice Chat' : 'Enter Voice Chat'}
+                            aria-pressed={isVoiceChatMode}
                         >
                             <Icon icon={isVoiceChatMode ? MicOff : Mic} size={14} />
                             <span className="hidden md:inline">Voice</span>
@@ -2724,6 +2842,8 @@ export default function ChatPage() {
                         onClick={() => setShowSessions(!showSessions)}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 hover:bg-[var(--surface-light)]"
                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                        aria-label={showSessions ? 'Hide session history' : 'Show session history'}
+                        aria-expanded={showSessions}
                     >
                         <Icon icon={MessageCircle} size={14} />
                         <span className="hidden md:inline">History</span>
@@ -2743,10 +2863,11 @@ export default function ChatPage() {
                                 onClick={async () => { try { setSessions(await listSessions()); } catch { /* ignore */ } }}
                                 className="p-1 rounded-lg hover:bg-[var(--surface-light)]"
                                 title="Refresh sessions"
+                                aria-label="Refresh sessions"
                             >
                                 <Icon icon={Loader2} size={13} style={{ color: 'var(--text-muted)' }} />
                             </button>
-                            <button onClick={() => setShowSessions(false)} className="p-1 rounded-lg hover:bg-[var(--surface-light)]">
+                            <button onClick={() => setShowSessions(false)} className="p-1 rounded-lg hover:bg-[var(--surface-light)]" aria-label="Close sessions panel">
                                 <Icon icon={X} size={14} style={{ color: 'var(--text-muted)' }} />
                             </button>
                         </div>
@@ -2874,6 +2995,48 @@ export default function ChatPage() {
                 onCopy={handleCopy}
                 scrollRef={scrollRef}
             />
+
+            {/* ── Approval Bubble ─────────────────────────────────────────────── */}
+            {pendingApproval && (
+                <div
+                    className="mx-auto max-w-3xl w-full px-4 md:px-6 mb-2 animate-fadeIn"
+                    role="alertdialog"
+                    aria-live="assertive"
+                    aria-label={`Approval required — ${pendingApproval.pendingIds.length} action${pendingApproval.pendingIds.length > 1 ? 's' : ''} need your confirmation`}
+                >
+                    <div className="rounded-2xl border p-4 space-y-3"
+                        style={{ background: 'var(--surface)', borderColor: 'rgba(251,191,36,0.5)', boxShadow: '0 0 12px rgba(251,191,36,0.12)' }}>
+                        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#fbbf24' }}>
+                            <span aria-hidden="true">⚠️</span>
+                            <span>Approval required — {pendingApproval.pendingIds.length} action{pendingApproval.pendingIds.length > 1 ? 's' : ''} need your confirmation</span>
+                        </div>
+                        <div className="space-y-2">
+                            {pendingApproval.messages.map((msg, i) => (
+                                <div key={i} className="rounded-xl px-3 py-2 text-xs font-mono whitespace-pre-wrap"
+                                    style={{ background: 'var(--surface-light)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                                    {msg}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                            <button
+                                onClick={handleApproveTools}
+                                className="flex-1 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+                                style={{ background: '#84cc16', color: '#000' }}
+                                aria-label="Approve and run the requested actions">
+                                ✅ Approve &amp; Run
+                            </button>
+                            <button
+                                onClick={handleDenyTools}
+                                className="flex-1 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+                                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+                                aria-label="Cancel and deny the requested actions">
+                                ✋ Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Slash Command Menu */}
             {showSlash && (
@@ -3290,28 +3453,34 @@ export default function ChatPage() {
                                 onPaste={handlePaste}
                                 placeholder={pastedImage ? 'Caption (optional)...' : attachedFile ? `About ${attachedFile.name}...` : isMultiAgentRunning ? 'Queuing...' : `Message ${getActiveAgentName()}...`}
                                 rows={1}
+                                spellCheck={false}
                                 className="flex-1 bg-transparent border-none outline-none resize-none text-sm py-2 px-1 placeholder-[var(--text-muted)]"
                                 style={{ color: 'var(--text-primary)', maxHeight: '120px' }}
+                                aria-label="Message input"
+                                aria-multiline="true"
                             />
                             {/* Send / Stop / Queue — mobile */}
                             {loading && !isMultiAgentRunning ? (
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                    <button onClick={handleStop} className="p-2.5 bg-red-500 hover:bg-red-400 rounded-xl text-white font-bold" title="Stop">
+                                    <button onClick={handleStop} className="p-2.5 bg-red-500 hover:bg-red-400 rounded-xl text-white font-bold" title="Stop" aria-label="Stop generating">
                                         <div className="w-4 h-4 bg-white rounded-sm" />
                                     </button>
                                     <button onClick={handleSendWithImage} disabled={!input.trim() && !pastedImage && !attachedFile}
-                                        className="p-2.5 bg-amber-500 hover:bg-amber-400 rounded-xl text-black font-bold disabled:opacity-30">
+                                        className="p-2.5 bg-amber-500 hover:bg-amber-400 rounded-xl text-black font-bold disabled:opacity-30"
+                                        aria-label="Queue message">
                                         <Icon icon={Clock} size={18} />
                                     </button>
                                 </div>
                             ) : isMultiAgentRunning ? (
                                 <button onClick={handleSendWithImage} disabled={!input.trim() && !pastedImage && !attachedFile}
-                                    className="p-2.5 bg-purple-500 hover:bg-purple-400 rounded-xl text-white font-bold disabled:opacity-30 shrink-0">
+                                    className="p-2.5 bg-purple-500 hover:bg-purple-400 rounded-xl text-white font-bold disabled:opacity-30 shrink-0"
+                                    aria-label="Queue message (Multi-Agent running)">
                                     <Icon icon={Clock} size={18} />
                                 </button>
                             ) : (
                                 <button onClick={handleSendWithImage} disabled={!input.trim() && !pastedImage && !attachedFile}
-                                    className="p-2.5 bg-lime-500 hover:bg-lime-400 rounded-xl text-black font-bold disabled:opacity-30 shrink-0">
+                                    className="p-2.5 bg-lime-500 hover:bg-lime-400 rounded-xl text-black font-bold disabled:opacity-30 shrink-0"
+                                    aria-label="Send message">
                                     <Icon icon={Send} size={18} />
                                 </button>
                             )}
@@ -3324,6 +3493,7 @@ export default function ChatPage() {
                             className="p-2.5 rounded-xl transition-all hover:bg-[var(--surface-light)]"
                             style={{ color: 'var(--text-muted)' }}
                             title="Attach file"
+                            aria-label="Attach file"
                         >
                             <Icon icon={Paperclip} size={18} />
                         </button>
@@ -3338,6 +3508,8 @@ export default function ChatPage() {
                                     color: showGenToolbar ? 'black' : 'var(--text-muted)',
                                 }}
                                 title="Image / Video generation"
+                                aria-label="Image / Video generation"
+                                aria-pressed={showGenToolbar}
                             >
                                 <Icon icon={Sparkles} size={18} />
                             </button>
@@ -3354,6 +3526,8 @@ export default function ChatPage() {
                                     border: isSummarizeActive ? '1px solid rgba(132,204,22,0.3)' : '1px solid transparent',
                                 }}
                                 title="Summarize — click to toggle summarize prefix"
+                                aria-label="Toggle summarize mode"
+                                aria-pressed={isSummarizeActive}
                             >
                                 <Icon icon={FileSearch} size={18} />
                             </button>
@@ -3376,8 +3550,11 @@ export default function ChatPage() {
                                             : `Message ${getActiveAgentName()}... (try: create a folder called test)`
                             }
                             rows={1}
+                            spellCheck={false}
                             className="flex-1 bg-transparent border-none outline-none resize-none text-sm py-2.5 px-1 placeholder-[var(--text-muted)]"
                             style={{ color: 'var(--text-primary)', maxHeight: '150px' }}
+                            aria-label="Message input"
+                            aria-multiline="true"
                         />
 
                         {/* Slash Commands Toggle — opens command menu above input */}
@@ -3399,6 +3576,8 @@ export default function ChatPage() {
                                 border: showSlash ? '1px solid rgba(132,204,22,0.3)' : '1px solid transparent',
                             }}
                             title="Commands"
+                            aria-label="Open slash commands"
+                            aria-expanded={showSlash}
                         >
                             <Icon icon={Slash} size={18} />
                         </button>
@@ -3411,6 +3590,7 @@ export default function ChatPage() {
                                     onClick={handleStop}
                                     className="p-2.5 bg-red-500 hover:bg-red-400 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/20"
                                     title="Stop generating and clear queue"
+                                    aria-label="Stop generating and clear queue"
                                 >
                                     <div className="w-4 h-4 bg-white rounded-sm mb-0.5 mx-0.5" />
                                 </button>
@@ -3420,6 +3600,7 @@ export default function ChatPage() {
                                     disabled={!input.trim() && !pastedImage && !attachedFile}
                                     className="p-2.5 bg-amber-500 hover:bg-amber-400 rounded-xl text-black font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
                                     title={`Add to queue${messageQueue.length > 0 ? ` (${messageQueue.length} already queued)` : ''}`}
+                                    aria-label={`Queue message${messageQueue.length > 0 ? ` (${messageQueue.length} already queued)` : ''}`}
                                 >
                                     <Icon icon={Clock} size={18} />
                                 </button>
@@ -3430,6 +3611,7 @@ export default function ChatPage() {
                                 disabled={!input.trim() && !pastedImage && !attachedFile}
                                 className="p-2.5 bg-purple-500 hover:bg-purple-400 rounded-xl text-white font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-lg shadow-purple-500/20"
                                 title="Queue message (Multi-Agent running)"
+                                aria-label="Queue message (Multi-Agent running)"
                             >
                                 <Icon icon={Clock} size={18} />
                             </button>
@@ -3438,6 +3620,7 @@ export default function ChatPage() {
                                 onClick={handleSendWithImage}
                                 disabled={!input.trim() && !pastedImage && !attachedFile}
                                 className="p-2.5 bg-lime-500 hover:bg-lime-400 rounded-xl text-black font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-lg shadow-lime-500/20"
+                                aria-label="Send message"
                             >
                                 <Icon icon={Send} size={18} />
                             </button>

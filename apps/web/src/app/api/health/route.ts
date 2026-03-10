@@ -1,9 +1,11 @@
+// Skales — Created by Mario Simic — skales.app
 import { NextResponse } from 'next/server';
 import { unstable_noStore as noStore } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
 
 import { DATA_DIR } from '@/lib/paths';
+import { APP_NAME, APP_VERSION, AUTHOR, HOMEPAGE } from '@/lib/meta';
 
 // Never cache this route — it reflects live process state.
 export const dynamic = 'force-dynamic';
@@ -79,8 +81,11 @@ export async function GET() {
     }
 
     return NextResponse.json({
+        app:       APP_NAME,
+        version:   APP_VERSION,
+        author:    AUTHOR,
+        homepage:  HOMEPAGE,
         skales:    true,       // Discovery marker — lets network scan verify Skales instances
-        version:   '5.0.0',
         timestamp: Date.now(),
         bots: {
             telegram: { running: telegramRunning },

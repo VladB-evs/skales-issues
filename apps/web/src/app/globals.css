@@ -309,3 +309,46 @@
     margin-left: 0;
   }
 }
+
+/* ─── Accessibility: Focus Indicators ──────────────────────────────────────────
+   Visible keyboard focus ring on all interactive elements.
+   Uses :focus-visible so mouse clicks don't show the ring (only Tab key).
+   ─────────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ring, #84cc16);
+  outline-offset: 2px;
+}
+/* Remove default outline only when our custom ring is active */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+/* Tailwind's focus:outline-none suppresses the ring — restore it */
+.focus\:outline-none:focus-visible {
+  outline: 2px solid var(--ring, #84cc16);
+  outline-offset: 2px;
+}
+
+/* ─── Accessibility: Skip-to-main link ──────────────────────────────────────
+   Hidden off-screen until focused by keyboard (Tab from address bar).
+   ─────────────────────────────────────────────────────────────────────────── */
+.skip-to-main {
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 18px;
+  background: var(--accent-color, #84cc16);
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 0 0 10px 10px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+  white-space: nowrap;
+}
+.skip-to-main:focus {
+  top: 0;
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}

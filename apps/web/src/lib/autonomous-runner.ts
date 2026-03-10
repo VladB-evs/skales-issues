@@ -381,9 +381,12 @@ async function tickFriendMode(settings: any): Promise<void> {
     if (Date.now() - lastSent < cooldown) return;
 
     // Check at least one channel is configured
-    const wantsTelegram = behavior.channels?.telegram !== false;
-    const wantsBrowser  = behavior.channels?.browser  !== false;
-    if (!wantsTelegram && !wantsBrowser) return;
+    // 'dashboard' = show in Dashboard Chat when app is open (pushDashboardMessage queue)
+    // 'browser'   = show as Desktop Buddy bubble when app is minimized (pushBuddyNotification)
+    const wantsTelegram = behavior.channels?.telegram  !== false;
+    const wantsBrowser  = behavior.channels?.browser   !== false;
+    const wantsDashboard = behavior.channels?.dashboard === true;
+    if (!wantsTelegram && !wantsBrowser && !wantsDashboard) return;
 
     // Verify Telegram is usable if needed
     let tgCfg: any = null;
@@ -481,11 +484,20 @@ async function tickFriendMode(settings: any): Promise<void> {
         }
     }
 
-    // Send via Desktop Buddy bubble (browser)
+    // Send via Desktop Buddy bubble (browser — visible when app is minimized to tray)
     if (wantsBrowser) {
         try {
             const { pushBuddyNotification } = await import('@/lib/buddy-notify');
             pushBuddyNotification(`🤝 ${checkInMsg}`);
+        } catch { /* non-fatal */ }
+    }
+
+    // Send via Dashboard Chat (visible when app window is open)
+    // Pushes to dashboard-queue.json which the Chat page polls every 5s
+    if (wantsDashboard) {
+        try {
+            const { pushDashboardMessage } = await import('@/lib/dashboard-notify');
+            pushDashboardMessage(`🤝 ${checkInMsg}`);
         } catch { /* non-fatal */ }
     }
 }
