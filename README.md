@@ -31,8 +31,19 @@ If you find this useful, a ⭐ helps others discover it
 [**Download**](https://skales.app) · [**Documentation**](https://docs.skales.app) · [**Blog**](https://getskales.app) · [**Changelog**](./CHANGELOG.md)
 
 ---
-
 </div>
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=skalesapp%2Fskales&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=skalesapp/skales&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=skalesapp/skales&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=skalesapp/skales&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
 
 ## ⚡ Why Skales?
 
